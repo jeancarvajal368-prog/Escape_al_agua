@@ -9,7 +9,10 @@
 :root{--bg1:#134e3a;--bg2:#0a2a1f}
 body{min-height:100vh;color:#fff;font-family:'Segoe UI',system-ui,sans-serif;user-select:none;-webkit-user-select:none;background:linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg1));background-size:300% 300%;animation:bgm 18s ease infinite;overflow-x:hidden}
 @keyframes bgm{50%{background-position:100% 100%}}
-#app{position:relative;max-width:660px;margin:0 auto;padding:14px;display:flex;flex-direction:column;align-items:center}
+#bgimg{position:fixed;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat;opacity:.28;pointer-events:none;display:none}
+#corner{position:fixed;right:10px;bottom:10px;width:clamp(90px,24vw,190px);height:auto;pointer-events:none;z-index:2;display:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-8px)}}
+#app{z-index:1;position:relative;max-width:660px;margin:0 auto;padding:14px;display:flex;flex-direction:column;align-items:center}
 header{width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 h1{font-size:1.45rem;text-shadow:0 3px 0 #a31d2e,0 6px 14px rgba(0,0,0,.5)}
 h1 small{color:#ffd84d}
@@ -57,8 +60,10 @@ button.ghost{background:rgba(255,255,255,.14);box-shadow:0 4px 0 rgba(0,0,0,.35)
 </style>
 </head>
 <body>
+<div id="bgimg"></div>
+<img id="corner" alt="">
 <div id="app">
- <header><h1>💧 Escape al Agua <small>3D</small></h1><button class="ghost" id="mute">🔊</button></header>
+ <header><h1>💧 Que no se acueste la gota <small>3D</small></h1><button class="ghost" id="mute">🔊</button></header>
  <div class="mister"><span class="bald">👨‍🦲</span> Jugando con el Mister Jean</div>
  <section id="menu" class="screen"><h2>🌍 Elige tu mundo</h2><div id="worlds"></div></section>
  <section id="lvls" class="screen hidden">
@@ -134,7 +139,16 @@ function solve(lvl){const s0=[lvl.s[0],lvl.s[1],0],seen=new Set([s0.join()]);let
  return -1}
 /*ENDLOGIC*/
 
+/* ====== IMÁGENES (opcional) ======
+   Pega aquí la dirección de tu imagen (https://...) o un código data:image/...
+   IMG_ESQUINA: aparece en la esquina inferior derecha del menú y de los niveles.
+   IMG_FONDO: aparece de fondo, suave, en todas las pantallas. Déjalas vacías ('') si no las quieres. */
+const COLOR_BLOQUE=0x1f5eff; // color del bloque (por ejemplo 0xe0222f para rojo)
+const IMG_ESQUINA='';
+const IMG_FONDO='';
 const PER=3,$=id=>document.getElementById(id);
+if(IMG_FONDO){const b=$('bgimg');b.style.backgroundImage='url("'+IMG_FONDO+'")';b.style.display='block'}
+if(IMG_ESQUINA){$('corner').src=IMG_ESQUINA}
 const WORLDS=[
  {n:'Río',e:'🏞️',bg:['#0e6b8a','#06324a'],t:['#b98b5a','#a07745'],w:'#2aa5c8'},
  {n:'Lago',e:'🦆',bg:['#1b7f6f','#0a3a36'],t:['#9fb3a0','#85998a'],w:'#2fb8a0'},
@@ -144,14 +158,14 @@ const WORLDS=[
 ];
 const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
 let W=0,L=0,lives=3,lv=null,st=[0,0,0],moves=0,limit=0,hist=[],locked=false,busy=false,muted=false,prog={};
-let water,drops=[],ripples=[],dropGeo,lastT=0,splashed=false,renderer,scene,camera,tilesG,mesh,pivot,ring,anim=null,t0=0,introStart=0,readyAt=0,intro=false,ox=0,oz=0,gl3d=true;
+let ringDl=0,water,drops=[],ripples=[],dropGeo,lastT=0,splashed=false,renderer,scene,camera,tilesG,mesh,pivot,ring,anim=null,t0=0,introStart=0,readyAt=0,intro=false,ox=0,oz=0,gl3d=true;
 try{prog=JSON.parse(localStorage.getItem('rbe3d_roll')||'{}')}catch(e){}
 const save=()=>{try{localStorage.setItem('rbe3d_roll',JSON.stringify(prog))}catch(e){}};
 /* ---------- Sonido ---------- */
 let AC;function beep(f,d=.12,t='sine',v=.15,at=0){if(muted)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,AC.currentTime+at);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+at+d);o.connect(g);g.connect(AC.destination);o.start(AC.currentTime+at);o.stop(AC.currentTime+at+d)}catch(e){}}
 $('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊'};
 /* ---------- Pantallas ---------- */
-function show(id){['menu','lvls','game'].forEach(s=>$(s).classList.toggle('hidden',s!==id));if(id==='menu')renderMenu()}
+function show(id){$('corner').style.display=(IMG_ESQUINA&&id!=='game')?'block':'none';['menu','lvls','game'].forEach(s=>$(s).classList.toggle('hidden',s!==id));if(id==='menu')renderMenu()}
 const stars=(w,l)=>prog[w+'-'+l]||0;
 const wOpen=w=>w===0||stars(w-1,PER-1)>0, lOpen=(w,l)=>wOpen(w)&&(l===0||stars(w,l-1)>0);
 function theme(w){const t=WORLDS[w],s=document.documentElement.style;s.setProperty('--bg1',t.bg[0]);s.setProperty('--bg2',t.bg[1])}
@@ -171,9 +185,9 @@ function initThree(){
  const dl=new THREE.DirectionalLight(0xffffff,.85);dl.position.set(-5,12,8);dl.castShadow=true;
  dl.shadow.mapSize.set(1024,1024);const sc=dl.shadow.camera;sc.left=-12;sc.right=12;sc.top=12;sc.bottom=-12;sc.near=1;sc.far=40;scene.add(dl);
  pivot=new THREE.Group();
- mesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0xe0222f,roughness:.35,metalness:.1}));
+ mesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:COLOR_BLOQUE,roughness:.35,metalness:.1}));
  mesh.castShadow=true;
- mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0x7a0a14})));
+ mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0x0b2a8a})));
  tilesG=new THREE.Group();scene.add(tilesG);scene.add(mesh);
  water=new THREE.Mesh(new THREE.PlaneGeometry(60,60,40,40),new THREE.MeshStandardMaterial({color:0x2aa5c8,transparent:true,opacity:.88,roughness:.15,metalness:.2}));
  water.rotation.x=-Math.PI/2;water.position.y=-.55;scene.add(water);
@@ -191,13 +205,18 @@ function buildLevel(){
  while(tilesG.children.length)tilesG.remove(tilesG.children[0]);
  const t=WORLDS[W].t;let maxDl=0;water.material.color.set(WORLDS[W].w);
  for(let y=0;y<lv.H;y++)for(let x=0;x<lv.Wd;x++){const c=lv.g[y][x];if(c==='.')continue;
+  if(c==='G'){ring=makeWhirl();ring.position.set(x+ox,-.36,y+oz);tilesG.add(ring);ringDl=(x+y)*55+150;maxDl=Math.max(maxDl,ringDl);continue}
   const h=c==='F'?.22:.3,col=c==='F'?'#d9f6ff':c==='G'?'#08304d':((x+y)%2?t[0]:t[1]);
   const m=new THREE.Mesh(new THREE.BoxGeometry(.96,h,.96),new THREE.MeshStandardMaterial({color:col,roughness:.8}));
   m.receiveShadow=true;m.position.set(x+ox,-h/2,y+oz);const dl=(x+y)*55+Math.random()*80;m.userData={dl,h};maxDl=Math.max(maxDl,dl);
-  if(c==='G'){ring=new THREE.Mesh(new THREE.RingGeometry(.3,.43,32,1,0,4.6),new THREE.MeshBasicMaterial({color:0x7df9ff,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=h/2+.012;m.add(ring)}
   tilesG.add(m)}
  t0=performance.now();introStart=t0+maxDl+350;readyAt=introStart+450;intro=true;mesh.visible=false;setMesh();scene.add(mesh);
 }
+function makeWhirl(){const mat=()=>new THREE.MeshBasicMaterial({color:0x7df9ff,side:THREE.DoubleSide});
+ const g=new THREE.Mesh(new THREE.RingGeometry(.3,.46,32,1,0,4.6),mat());
+ const g2=new THREE.Mesh(new THREE.RingGeometry(.12,.22,24,1,0,4),mat());g2.rotation.z=2.6;g.add(g2);
+ const disc=new THREE.Mesh(new THREE.CircleGeometry(.46,32),new THREE.MeshBasicMaterial({color:0x04203a,transparent:true,opacity:.55,side:THREE.DoubleSide}));disc.position.z=-.01;g.add(disc);
+ g.rotation.x=-Math.PI/2;return g}
 const ease3=k=>1-Math.pow(1-k,3);
 function splash(x,z,n=20){
  const col=new THREE.Color(WORLDS[W].w).lerp(new THREE.Color(0xffffff),.6);
@@ -214,7 +233,7 @@ function frame(now){
  if(!lv){renderer.render(scene,camera);return}
  for(const m of tilesG.children){const u=m.userData;if(u.dl===undefined)continue;const tt=(now-t0-u.dl)/450;
   if(tt<0)m.visible=false;else{m.visible=true;m.position.y=-u.h/2+(1-ease3(Math.min(tt,1)))*7}}
- if(ring){const s=1+.12*Math.sin(now/220);ring.scale.set(s,s,s);ring.rotation.z=now/250}
+ if(ring){const s=1+.12*Math.sin(now/220);ring.scale.set(s,s,s);ring.rotation.z=now/250;ring.visible=now-t0>ringDl}
  if(now<introStart)mesh.visible=false;
  else if(intro){const k=Math.min(1,(now-introStart)/450);mesh.visible=true;mesh.position.y=center(st)[1]+(1-ease3(k))*9;if(k>=1)intro=false}
  if(anim)anim(now);
